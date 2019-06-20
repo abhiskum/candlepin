@@ -112,7 +112,7 @@ public class ArtemisJobMessageDispatcher implements JobMessageDispatcher {
             String eventString = this.objMapper.writeValueAsString(jobMessage);
             message.getBodyBuffer().writeString(eventString);
 
-            log.debug("Sending message to {}: {}", MessageAddress.JOB_MESSAGE_ADDRESS, eventString);
+            log.debug("Sending message to \"{}\": {}", MessageAddress.JOB_MESSAGE_ADDRESS, eventString);
 
             ClientProducer producer = this.getClientProducer();
             producer.send(MessageAddress.JOB_MESSAGE_ADDRESS, message);

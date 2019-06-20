@@ -18,6 +18,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 
+
 /**
  * The JobMessage class represents a message to be sent between Candlepin's job management system
  * and the messaging system connecting various Candlepin nodes or compatible systems.
@@ -63,6 +64,6 @@ public class JobMessage {
 
     @Override
     public String toString() {
-        return String.format("JobMessage [id: %s, key: %s]", this.jobKey, this.jobId);
+        return String.format("JobMessage [id: %s, key: %s]", this.getJobId(), this.getJobKey());
     }
 }
