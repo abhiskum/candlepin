@@ -14,6 +14,7 @@
  */
 package org.candlepin.dto.api.v1;
 
+import org.candlepin.async.JobManager;
 import org.candlepin.dto.CandlepinDTO;
 
 /**
@@ -39,6 +40,17 @@ public class SchedulerStatusDTO extends CandlepinDTO<SchedulerStatusDTO> {
      */
     public SchedulerStatusDTO(SchedulerStatusDTO source) {
         super(source);
+    }
+
+    /**
+     * Sets the status of the scheduler .
+     *
+     * @param state
+     *
+     * @return a reference to this SchedulerStatusDTO object
+     */
+    public SchedulerStatusDTO(JobManager.ManagerState state) {
+        this.isRunning = state == JobManager.ManagerState.RUNNING;
     }
 
     /**

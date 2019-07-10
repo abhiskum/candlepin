@@ -17,12 +17,18 @@ package org.candlepin.async.temp;
 import org.candlepin.auth.Verify;
 import com.google.inject.Inject;
 import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiResponse;
+import io.swagger.annotations.ApiResponses;
+
 import org.candlepin.async.JobConfig;
 import org.candlepin.async.JobException;
 import org.candlepin.async.JobManager;
 import org.candlepin.common.config.Configuration;
+import org.candlepin.common.exceptions.BadRequestException;
+import org.candlepin.common.exceptions.NotFoundException;
 import org.candlepin.dto.ModelTranslator;
 import org.candlepin.dto.api.v1.AsyncJobStatusDTO;
+import org.candlepin.dto.api.v1.SchedulerStatusDTO;
 import org.candlepin.model.AsyncJobStatus;
 import org.candlepin.model.AsyncJobStatusCurator;
 import org.candlepin.model.OwnerCurator;
@@ -31,7 +37,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.xnap.commons.i18n.I18n;
 
+import java.util.Map;
+
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.DELETE;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -40,6 +50,7 @@ import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 
 /**
@@ -139,5 +150,79 @@ public class AsyncJobResource {
 
         return this.translator.translate(status, AsyncJobStatusDTO.class);
     }
+
+    @POST
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    @Path("schedule/{job_key}")
+    @ApiOperation(notes = "Schedules the given job for immediate execution", value = "")
+    public AsyncJobStatusDTO schedule(
+        @Context HttpServletRequest request,
+        @PathParam("job_key") String jobKey)
+        throws JobException {
+
+        JobConfig config = JobConfig.forJob(jobKey);
+
+        // Add all of the query params as job arguments
+        for (Object entry : request.getParameterMap().entrySet()) {
+            Map.Entry<String, String[]> queryParam = (Map.Entry<String, String[]>) entry;
+
+            String param = queryParam.getKey();
+            String[] vals = queryParam.getValue();
+
+            config.setJobArgument(param, vals.length > 1 ? vals : vals[0]);
+        }
+
+        AsyncJobStatus status = this.jobManager.queueJob(config);
+        return this.translator.translate(status, AsyncJobStatusDTO.class);
+    }
+
+
+    @ApiOperation(notes = "Cancels a Job Status", value = "cancel")
+    @ApiResponses({
+        @ApiResponse(code = 400, message = ""),
+        @ApiResponse(code = 404, message = "") })
+    @DELETE
+    @Path("/{job_id}")
+    @Produces(MediaType.APPLICATION_JSON)
+    public AsyncJobStatusDTO cancel(@PathParam("job_id") @Verify(AsyncJobStatus.class) String jobId) {
+        final AsyncJobStatus cancelled;
+        try {
+            cancelled = this.jobManager.cancelJob(jobId);
+        }
+        catch (IllegalStateException e) {
+            throw new BadRequestException("Could not cancel job with id: " + jobId, e);
+        }
+        if (cancelled == null) {
+            throw new NotFoundException(
+                String.format("Could not cancel job with id: %s. Job was not found!", jobId));
+        }
+        return this.translator.translate(cancelled, AsyncJobStatusDTO.class);
+    }
+
+    @ApiOperation(notes = "Retrieves the Scheduler Status", value = "getSchedulerStatus")
+    @GET
+    @Path("/scheduler")
+    @Produces(MediaType.APPLICATION_JSON)
+    public SchedulerStatusDTO getSchedulerStatus() {
+        return new SchedulerStatusDTO(jobManager.status());
+    }
+
+    @ApiOperation(notes = "Updates the Scheduler Status", value = "setSchedulerStatus")
+    @ApiResponses({ @ApiResponse(code = 500, message = "") })
+    @POST
+    @Path("/scheduler")
+    @Produces(MediaType.APPLICATION_JSON)
+    @Consumes(MediaType.APPLICATION_JSON)
+    public SchedulerStatusDTO setSchedulerStatus(boolean running) {
+        if (running) {
+            this.jobManager.resume();
+        }
+        else {
+            this.jobManager.pause();
+        }
+        return getSchedulerStatus();
+    }
+
 
 }

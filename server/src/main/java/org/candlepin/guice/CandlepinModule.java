@@ -32,6 +32,7 @@ import org.candlepin.async.JobManager;
 import org.candlepin.async.impl.ArtemisJobMessageDispatcher;
 import org.candlepin.async.tasks.CRLUpdateJob;
 import org.candlepin.async.tasks.ExportJob;
+import org.candlepin.async.tasks.HealEntireOrgJob;
 import org.candlepin.async.tasks.HypervisorHeartbeatUpdateJob;
 import org.candlepin.async.tasks.HypervisorUpdateJob;
 import org.candlepin.async.tasks.ImportJob;
@@ -439,6 +440,7 @@ public class CandlepinModule extends AbstractModule {
         JobManager.registerJob(RefreshPoolsJob.JOB_KEY, RefreshPoolsJob.class);
         JobManager.registerJob(RegenEnvEntitlementCertsJob.JOB_KEY, RegenEnvEntitlementCertsJob.class);
         JobManager.registerJob(UndoImportsJob.JOB_KEY, UndoImportsJob.class);
+        JobManager.registerJob(HealEntireOrgJob.JOB_KEY, HealEntireOrgJob.class);
     }
 
     private void configurePinsetter() {

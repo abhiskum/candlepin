@@ -480,6 +480,10 @@ class Candlepin
     post("/jobs/scheduler", {}, status)
   end
 
+  def set_async_scheduler_status(status)
+    post("/async/scheduler", {}, status)
+  end
+
   def trigger_job(job, async=false)
     return async_call(!async) do
       post("/jobs/schedule/#{job}")
@@ -1367,6 +1371,10 @@ class Candlepin
 
   def cancel_job(job_id)
     delete "/jobs/#{job_id}"
+  end
+
+  def cancel_async_job(job_id)
+    delete "/async/#{job_id}"
   end
 
   def import(owner_key, filename, params = {}, headers = {})

@@ -96,7 +96,7 @@ public class JobManager implements ModeChangeListener {
     /**
      * Enum representing known manager states, and valid state transitions
      */
-    public static enum ManagerState {
+    public enum ManagerState {
         // Impl note: We have to use strings here since we can't reference enums that haven't yet
         // been defined. This is slightly less efficient than I'd like, but whatever.
         CREATED("INITIALIZED", "SHUTDOWN"),
@@ -126,6 +126,7 @@ public class JobManager implements ModeChangeListener {
         public boolean isTerminal() {
             return this.transitions == null;
         }
+
     }
 
     /**
@@ -415,6 +416,16 @@ public class JobManager implements ModeChangeListener {
             // TODO: Change this to something a bit nicer. Maybe a JobException?
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * Return current state of the JobManager
+     *
+     * @return current state of the JobManager
+     */
+    public synchronized ManagerState status() {
+        log.trace("Retrieving JobManager status");
+        return this.state;
     }
 
     /**
@@ -1225,5 +1236,46 @@ public class JobManager implements ModeChangeListener {
                     log.warn("Received an unexpected mode change notice: {}", mode);
             }
         }
+    }
+
+    /**
+     * Lookup job status by job id.
+     *
+     * @param jobId
+     *  Id of the requested job
+     *
+     * @return
+     *  {@link AsyncJobStatus} of the requested job or null
+     */
+    public AsyncJobStatus getJob(final String jobId) {
+        return this.jobCurator.get(jobId);
+    }
+
+    /**
+     * Request cancellation of the job with the given id.
+     *
+     * @param jobId
+     *  Id of the cancelled job or null if cancelled job was not found
+     *
+     * @return
+     *  {@link AsyncJobStatus} of the cancelled job
+     *
+     * @throws IllegalStateException
+     *  When cancelled job is already terminated (CANCELLED, COMPLETED, ...)
+     */
+    @Transactional
+    public AsyncJobStatus cancelJob(final String jobId) {
+        final AsyncJobStatus status = this.getJob(jobId);
+        if (status == null) {
+            return null;
+        }
+        if (status.getState().isTerminal()) {
+            throw new IllegalStateException(
+                String.format("Job with id: %s is already in terminated state: %s!", jobId, status.getState())
+            );
+        }
+        status.setState(JobState.CANCELED);
+        this.jobCurator.merge(status);
+        return status;
     }
 }
