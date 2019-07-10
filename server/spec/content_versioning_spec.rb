@@ -279,7 +279,7 @@ describe 'Content Versioning' do
       end
 
       sleep 1
-      @cp.trigger_job("OrphanCleanupJob");
+      @cp.trigger_async_job("ORPHAN_CLEANUP");
 
       updater.join
       generator.join

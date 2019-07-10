@@ -35,19 +35,16 @@ public class SchedulerStatusDTO extends CandlepinDTO<SchedulerStatusDTO> {
      * Initializes a new SchedulerStatusDTO instance which is a shallow copy of the provided
      * source entity.
      *
-     * @param source
-     *  The source entity to copy
+     * @param source The source entity to copy
      */
     public SchedulerStatusDTO(SchedulerStatusDTO source) {
         super(source);
     }
 
     /**
-     * Sets the status of the scheduler .
+     * Sets the status of the scheduler.
      *
-     * @param state
-     *
-     * @return a reference to this SchedulerStatusDTO object
+     * @param state the job manager status
      */
     public SchedulerStatusDTO(JobManager.ManagerState state) {
         this.isRunning = state == JobManager.ManagerState.RUNNING;
@@ -57,7 +54,6 @@ public class SchedulerStatusDTO extends CandlepinDTO<SchedulerStatusDTO> {
      * Sets the status of the scheduler (true for running, false otherwise).
      *
      * @param isRunning the isRunning to set
-     *
      * @return a reference to this SchedulerStatusDTO object
      */
     public SchedulerStatusDTO setRunning(Boolean isRunning) {

@@ -14,33 +14,26 @@
  */
 package org.candlepin.guice;
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.PropertyAccessor;
-import com.fasterxml.jackson.databind.AnnotationIntrospector;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.introspect.AnnotationIntrospectorPair;
-import com.fasterxml.jackson.databind.introspect.JacksonAnnotationIntrospector;
-import com.fasterxml.jackson.databind.ser.impl.SimpleBeanPropertyFilter;
-import com.fasterxml.jackson.databind.ser.impl.SimpleFilterProvider;
-import com.fasterxml.jackson.datatype.hibernate5.Hibernate5Module;
-import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
-import com.fasterxml.jackson.module.jaxb.JaxbAnnotationIntrospector;
-import org.candlepin.async.JobMessageDispatcher;
 import org.candlepin.async.JobManager;
+import org.candlepin.async.JobMessageDispatcher;
 import org.candlepin.async.impl.ArtemisJobMessageDispatcher;
+import org.candlepin.async.tasks.ActiveEntitlementJob;
+import org.candlepin.async.tasks.JobCleaner;
 import org.candlepin.async.tasks.CRLUpdateJob;
+import org.candlepin.async.tasks.ExpiredPoolsCleanupJob;
 import org.candlepin.async.tasks.ExportJob;
 import org.candlepin.async.tasks.HealEntireOrgJob;
 import org.candlepin.async.tasks.HypervisorHeartbeatUpdateJob;
 import org.candlepin.async.tasks.HypervisorUpdateJob;
 import org.candlepin.async.tasks.ImportJob;
+import org.candlepin.async.tasks.ImportRecordCleanerJob;
 import org.candlepin.async.tasks.ManifestCleanerJob;
+import org.candlepin.async.tasks.OrphanCleanupJob;
 import org.candlepin.async.tasks.RefreshPoolsForProductJob;
 import org.candlepin.async.tasks.RefreshPoolsJob;
 import org.candlepin.async.tasks.RegenEnvEntitlementCertsJob;
 import org.candlepin.async.tasks.UndoImportsJob;
+import org.candlepin.async.tasks.UnmappedGuestEntitlementCleanerJob;
 import org.candlepin.async.temp.AsyncJobResource;
 import org.candlepin.async.temp.TestJob1;
 import org.candlepin.audit.AMQPBusPublisher;
@@ -106,14 +99,13 @@ import org.candlepin.pinsetter.core.PinsetterKernel;
 import org.candlepin.pinsetter.core.PinsetterTriggerListener;
 import org.candlepin.pinsetter.tasks.CertificateRevocationListTask;
 import org.candlepin.pinsetter.tasks.EntitlerJob;
-import org.candlepin.pinsetter.tasks.JobCleaner;
 import org.candlepin.pinsetter.tasks.SweepBarJob;
 import org.candlepin.pinsetter.tasks.UnpauseJob;
-import org.candlepin.pki.impl.JSSPrivateKeyReader;
+import org.candlepin.pki.CertificateReader;
 import org.candlepin.pki.PKIUtility;
 import org.candlepin.pki.PrivateKeyReader;
-import org.candlepin.pki.CertificateReader;
 import org.candlepin.pki.impl.JSSPKIUtility;
+import org.candlepin.pki.impl.JSSPrivateKeyReader;
 import org.candlepin.policy.SystemPurposeComplianceRules;
 import org.candlepin.policy.criteria.CriteriaRules;
 import org.candlepin.policy.js.JsRunner;
@@ -187,6 +179,19 @@ import org.candlepin.util.ExpiryDateFunction;
 import org.candlepin.util.FactValidator;
 import org.candlepin.util.X509ExtensionUtil;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.databind.AnnotationIntrospector;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.introspect.AnnotationIntrospectorPair;
+import com.fasterxml.jackson.databind.introspect.JacksonAnnotationIntrospector;
+import com.fasterxml.jackson.databind.ser.impl.SimpleBeanPropertyFilter;
+import com.fasterxml.jackson.databind.ser.impl.SimpleFilterProvider;
+import com.fasterxml.jackson.datatype.hibernate5.Hibernate5Module;
+import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import com.fasterxml.jackson.module.jaxb.JaxbAnnotationIntrospector;
 import com.google.common.base.Function;
 import com.google.inject.AbstractModule;
 import com.google.inject.Provides;
@@ -198,13 +203,11 @@ import com.google.inject.persist.jpa.JpaPersistModule;
 
 import org.hibernate.cfg.beanvalidation.BeanValidationEventListener;
 import org.hibernate.validator.HibernateValidator;
-
 import org.quartz.JobListener;
-import org.quartz.TriggerListener;
 import org.quartz.SchedulerFactory;
+import org.quartz.TriggerListener;
 import org.quartz.impl.StdSchedulerFactory;
 import org.quartz.spi.JobFactory;
-
 import org.xnap.commons.i18n.I18n;
 
 import io.swagger.jaxrs.config.BeanConfig;
@@ -430,17 +433,24 @@ public class CandlepinModule extends AbstractModule {
 
         JobManager.registerJob(TestJob1.JOB_KEY, TestJob1.class);
 
+        JobManager.registerJob(ActiveEntitlementJob.JOB_KEY, ActiveEntitlementJob.class);
         JobManager.registerJob(CRLUpdateJob.JOB_KEY, CRLUpdateJob.class);
+        JobManager.registerJob(ExpiredPoolsCleanupJob.JOB_KEY, ExpiredPoolsCleanupJob.class);
         JobManager.registerJob(ExportJob.JOB_KEY, ExportJob.class);
+        JobManager.registerJob(HealEntireOrgJob.JOB_KEY, HealEntireOrgJob.class);
         JobManager.registerJob(HypervisorUpdateJob.JOB_KEY, HypervisorUpdateJob.class);
         JobManager.registerJob(HypervisorHeartbeatUpdateJob.JOB_KEY, HypervisorHeartbeatUpdateJob.class);
         JobManager.registerJob(ImportJob.JOB_KEY, ImportJob.class);
+        JobManager.registerJob(ImportRecordCleanerJob.JOB_KEY, ImportRecordCleanerJob.class);
+        JobManager.registerJob(JobCleaner.JOB_KEY, JobCleaner.class);
         JobManager.registerJob(ManifestCleanerJob.JOB_KEY, ManifestCleanerJob.class);
+        JobManager.registerJob(OrphanCleanupJob.JOB_KEY, OrphanCleanupJob.class);
         JobManager.registerJob(RefreshPoolsForProductJob.JOB_KEY, RefreshPoolsForProductJob.class);
         JobManager.registerJob(RefreshPoolsJob.JOB_KEY, RefreshPoolsJob.class);
         JobManager.registerJob(RegenEnvEntitlementCertsJob.JOB_KEY, RegenEnvEntitlementCertsJob.class);
         JobManager.registerJob(UndoImportsJob.JOB_KEY, UndoImportsJob.class);
-        JobManager.registerJob(HealEntireOrgJob.JOB_KEY, HealEntireOrgJob.class);
+        JobManager.registerJob(UnmappedGuestEntitlementCleanerJob.JOB_KEY,
+            UnmappedGuestEntitlementCleanerJob.class);
     }
 
     private void configurePinsetter() {
@@ -449,7 +459,7 @@ public class CandlepinModule extends AbstractModule {
         bind(TriggerListener.class).to(PinsetterTriggerListener.class);
         bind(PinsetterKernel.class);
         bind(CertificateRevocationListTask.class);
-        bind(JobCleaner.class);
+        bind(org.candlepin.pinsetter.tasks.JobCleaner.class);
         bind(UnpauseJob.class);
         bind(SweepBarJob.class);
     }
